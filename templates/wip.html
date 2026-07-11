@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES系统 - WIP报表</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>MES系统</h2>
+        <ul>
+            <li><a href="/">首页</a></li>
+            <li><a href="/bom">BOM管理</a></li>
+            <li><a href="/workorder">工单管理</a></li>
+            <li><a href="/workflow">工作流</a></li>
+            <li><a href="/production">生产采集</a></li>
+            <li><a href="/wip" class="active">WIP报表</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <h1>WIP在制品报表</h1>
+        </div>
+        <div class="wip-stats">
+            <div class="stat-card">
+                <div class="value" id="totalQty">-</div>
+                <div class="label">总计划数量</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="value" id="producedQty">-</div>
+                <div class="label">已生产数量</div>
+            </div>
+            <div class="stat-card success">
+                <div class="value" id="scrapQty">-</div>
+                <div class="label">报废数量</div>
+            </div>
+            <div class="stat-card info">
+                <div class="value" id="avgProgress">-</div>
+                <div class="label">平均进度</div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>工单进度详情</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工单号</th>
+                        <th>产品名称</th>
+                        <th>计划数量</th>
+                        <th>已生产</th>
+                        <th>报废</th>
+                        <th>完成率</th>
+                        <th>进度</th>
+                        <th>任务状态</th>
+                        <th>工单状态</th>
+                    </tr>
+                </thead>
+                <tbody id="wipTable">
+                    <tr><td colspan="9" style="text-align:center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        async function loadWIP() {
+            const res = await fetch('/api/wip');
+            const data = await res.json();
+
+            const totalQty = data.reduce((sum, item) => sum + item.total_quantity, 0);
+            const producedQty = data.reduce((sum, item) => sum + item.produced_quantity, 0);
+            const scrapQty = data.reduce((sum, item) => sum + item.scrap_quantity, 0);
+            const avgProgress = data.length > 0 ?
+                (data.reduce((sum, item) => sum + item.progress, 0) / data.length).toFixed(1) : 0;
+
+            document.getElementById('totalQty').textContent = totalQty;
+            document.getElementById('producedQty').textContent = producedQty;
+            document.getElementById('scrapQty').textContent = scrapQty;
+            document.getElementById('avgProgress').textContent = avgProgress + '%';
+
+            const tbody = document.getElementById('wipTable');
+            tbody.innerHTML = data.map(item => {
+                const completionRate = item.total_quantity > 0 ?
+                    ((item.produced_quantity / item.total_quantity) * 100).toFixed(1) : 0;
+                return `
+                <tr>
+                    <td>${item.order_no}</td>
+                    <td>${item.product_name}</td>
+                    <td>${item.total_quantity}</td>
+                    <td>${item.produced_quantity}</td>
+                    <td>${item.scrap_quantity}</td>
+                    <td>${completionRate}%</td>
+                    <td>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width:${item.progress}%"></div>
+                        </div>
+                        <div style="text-align:right; font-size:12px; margin-top:4px;">${item.progress}%</div>
+                    </td>
+                    <td>${item.completed_tasks}/${item.total_tasks} 任务
+                        ${item.in_progress_tasks > 0 ? `(${item.in_progress_tasks}进行中)` : ''}
+                    </td>
+                    <td><span class="status-${item.status.replace(' ', '_')}">${getStatusText(item.status)}</span></td>
+                </tr>
+            `}).join('');
+        }
+
+        function getStatusText(status) {
+            const map = { 'pending': '待处理', 'in_progress': '进行中', 'completed': '已完成', 'cancelled': '已取消' };
+            return map[status] || status;
+        }
+
+        loadWIP();
+    </script>
+</body>
+</html>

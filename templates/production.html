@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES系统 - 生产采集</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>MES系统</h2>
+        <ul>
+            <li><a href="/">首页</a></li>
+            <li><a href="/bom">BOM管理</a></li>
+            <li><a href="/workorder">工单管理</a></li>
+            <li><a href="/workflow">工作流</a></li>
+            <li><a href="/production" class="active">生产采集</a></li>
+            <li><a href="/wip">WIP报表</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <h1>生产过程采集</h1>
+        </div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3>生产记录列表</h3>
+                <button class="btn btn-primary" onclick="openModal()">新增记录</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>所属任务</th>
+                        <th>工作中心</th>
+                        <th>操作员</th>
+                        <th>开始时间</th>
+                        <th>结束时间</th>
+                        <th>产量</th>
+                        <th>报废数量</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="productionTable">
+                    <tr><td colspan="9" style="text-align:center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>新增生产记录</h3>
+            <form id="productionForm">
+                <div class="form-group">
+                    <label>所属任务</label>
+                    <select id="task_id" required>
+                        <option value="">请选择任务</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>工作中心</label>
+                    <input type="text" id="work_center" required>
+                </div>
+                <div class="form-group">
+                    <label>操作员</label>
+                    <input type="text" id="operator" required>
+                </div>
+                <div class="form-group">
+                    <label>开始时间</label>
+                    <input type="datetime-local" id="start_time" required>
+                </div>
+                <div class="form-group">
+                    <label>结束时间</label>
+                    <input type="datetime-local" id="end_time" required>
+                </div>
+                <div class="form-group">
+                    <label>产量</label>
+                    <input type="number" id="quantity" required>
+                </div>
+                <div class="form-group">
+                    <label>报废数量</label>
+                    <input type="number" id="scrap_quantity" value="0">
+                </div>
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="remarks"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success">保存</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        let tasks = [];
+
+        async function loadTasks() {
+            const res = await fetch('/api/workflow');
+            tasks = await res.json();
+            const select = document.getElementById('task_id');
+            select.innerHTML = '<option value="">请选择任务</option>' +
+                tasks.map(t => `<option value="${t.id}">${t.task_code} - ${t.task_name}</option>`).join('');
+        }
+
+        async function loadProduction() {
+            await loadTasks();
+            const res = await fetch('/api/production');
+            const data = await res.json();
+            const tbody = document.getElementById('productionTable');
+            tbody.innerHTML = data.map(item => {
+                const task = tasks.find(t => t.id === item.task_id);
+                return `
+                <tr>
+                    <td>${task ? task.task_name : '-'}</td>
+                    <td>${item.work_center}</td>
+                    <td>${item.operator}</td>
+                    <td>${item.start_time ? new Date(item.start_time).toLocaleString() : '-'}</td>
+                    <td>${item.end_time ? new Date(item.end_time).toLocaleString() : '-'}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.scrap_quantity}</td>
+                    <td>${item.remarks || '-'}</td>
+                    <td class="actions">
+                        <button class="btn btn-danger" onclick="deleteProduction(${item.id})">删除</button>
+                    </td>
+                </tr>
+            `}).join('');
+        }
+
+        function openModal() {
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('productionForm').reset();
+            loadTasks();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        document.getElementById('productionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                task_id: parseInt(document.getElementById('task_id').value),
+                work_center: document.getElementById('work_center').value,
+                operator: document.getElementById('operator').value,
+                start_time: document.getElementById('start_time').value,
+                end_time: document.getElementById('end_time').value,
+                quantity: parseInt(document.getElementById('quantity').value),
+                scrap_quantity: parseInt(document.getElementById('scrap_quantity').value) || 0,
+                remarks: document.getElementById('remarks').value
+            };
+            await fetch('/api/production', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            closeModal();
+            loadProduction();
+        });
+
+        async function deleteProduction(id) {
+            if (confirm('确定要删除这个生产记录吗？')) {
+                await fetch(`/api/production/${id}`, { method: 'DELETE' });
+                loadProduction();
+            }
+        }
+
+        loadProduction();
+    </script>
+</body>
+</html>

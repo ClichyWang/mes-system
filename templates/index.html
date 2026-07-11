@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES系统 - 首页</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>MES系统</h2>
+        <ul>
+            <li><a href="/" class="active">首页</a></li>
+            <li><a href="/bom">BOM管理</a></li>
+            <li><a href="/workorder">工单管理</a></li>
+            <li><a href="/workflow">工作流</a></li>
+            <li><a href="/production">生产采集</a></li>
+            <li><a href="/wip">WIP报表</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <h1>欢迎使用MES制造执行系统</h1>
+        </div>
+        <div class="card">
+            <h3>系统概览</h3>
+            <div class="wip-stats">
+                <div class="stat-card">
+                    <div class="value" id="totalOrders">-</div>
+                    <div class="label">总工单</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="value" id="inProgress">-</div>
+                    <div class="label">进行中</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="value" id="completed">-</div>
+                    <div class="label">已完成</div>
+                </div>
+                <div class="stat-card info">
+                    <div class="value" id="bomCount">-</div>
+                    <div class="label">BOM数量</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <h3>最近工单</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工单号</th>
+                        <th>产品名称</th>
+                        <th>数量</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                    </tr>
+                </thead>
+                <tbody id="recentOrders">
+                    <tr><td colspan="5" style="text-align:center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        async function loadData() {
+            const woRes = await fetch('/api/workorder');
+            const woData = await woRes.json();
+            document.getElementById('totalOrders').textContent = woData.length;
+            document.getElementById('inProgress').textContent = woData.filter(w => w.status === 'in_progress').length;
+            document.getElementById('completed').textContent = woData.filter(w => w.status === 'completed').length;
+
+            const bomRes = await fetch('/api/bom');
+            const bomData = await bomRes.json();
+            document.getElementById('bomCount').textContent = bomData.length;
+
+            const recent = woData.slice(-5).reverse();
+            const tbody = document.getElementById('recentOrders');
+            tbody.innerHTML = recent.map(w => `
+                <tr>
+                    <td>${w.order_no}</td>
+                    <td>${w.product_name}</td>
+                    <td>${w.quantity}</td>
+                    <td><span class="status-${w.status.replace(' ', '_')}">${getStatusText(w.status)}</span></td>
+                    <td>${new Date(w.created_at).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusText(status) {
+            const map = { 'pending': '待处理', 'in_progress': '进行中', 'completed': '已完成', 'cancelled': '已取消' };
+            return map[status] || status;
+        }
+
+        loadData();
+    </script>
+</body>
+</html>

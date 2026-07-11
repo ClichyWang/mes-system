@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES系统 - BOM管理</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>MES系统</h2>
+        <ul>
+            <li><a href="/">首页</a></li>
+            <li><a href="/bom" class="active">BOM管理</a></li>
+            <li><a href="/workorder">工单管理</a></li>
+            <li><a href="/workflow">工作流</a></li>
+            <li><a href="/production">生产采集</a></li>
+            <li><a href="/wip">WIP报表</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <h1>BOM管理</h1>
+        </div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3>BOM列表</h3>
+                <button class="btn btn-primary" onclick="openModal()">新增BOM</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>产品编码</th>
+                        <th>产品名称</th>
+                        <th>父项</th>
+                        <th>子项</th>
+                        <th>数量</th>
+                        <th>单位</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="bomTable">
+                    <tr><td colspan="8" style="text-align:center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>新增BOM</h3>
+            <form id="bomForm">
+                <div class="form-group">
+                    <label>产品编码</label>
+                    <input type="text" id="product_code" required>
+                </div>
+                <div class="form-group">
+                    <label>产品名称</label>
+                    <input type="text" id="product_name" required>
+                </div>
+                <div class="form-group">
+                    <label>父项</label>
+                    <input type="text" id="parent_item" required>
+                </div>
+                <div class="form-group">
+                    <label>子项</label>
+                    <input type="text" id="child_item" required>
+                </div>
+                <div class="form-group">
+                    <label>数量</label>
+                    <input type="number" id="quantity" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>单位</label>
+                    <input type="text" id="unit" required>
+                </div>
+                <button type="submit" class="btn btn-success">保存</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        async function loadBOM() {
+            const res = await fetch('/api/bom');
+            const data = await res.json();
+            const tbody = document.getElementById('bomTable');
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td>${item.product_code}</td>
+                    <td>${item.product_name}</td>
+                    <td>${item.parent_item}</td>
+                    <td>${item.child_item}</td>
+                    <td>${item.quantity}</td>
+                    <td>${item.unit}</td>
+                    <td>${new Date(item.created_at).toLocaleString()}</td>
+                    <td class="actions">
+                        <button class="btn btn-danger" onclick="deleteBOM(${item.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function openModal() {
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('bomForm').reset();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        document.getElementById('bomForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                product_code: document.getElementById('product_code').value,
+                product_name: document.getElementById('product_name').value,
+                parent_item: document.getElementById('parent_item').value,
+                child_item: document.getElementById('child_item').value,
+                quantity: parseFloat(document.getElementById('quantity').value),
+                unit: document.getElementById('unit').value
+            };
+            await fetch('/api/bom', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            closeModal();
+            loadBOM();
+        });
+
+        async function deleteBOM(id) {
+            if (confirm('确定要删除这个BOM吗？')) {
+                await fetch(`/api/bom/${id}`, { method: 'DELETE' });
+                loadBOM();
+            }
+        }
+
+        loadBOM();
+    </script>
+</body>
+</html>

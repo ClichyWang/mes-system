@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MES系统 - 工单管理</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="sidebar">
+        <h2>MES系统</h2>
+        <ul>
+            <li><a href="/">首页</a></li>
+            <li><a href="/bom">BOM管理</a></li>
+            <li><a href="/workorder" class="active">工单管理</a></li>
+            <li><a href="/workflow">工作流</a></li>
+            <li><a href="/production">生产采集</a></li>
+            <li><a href="/wip">WIP报表</a></li>
+        </ul>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <h1>工单管理</h1>
+        </div>
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3>工单列表</h3>
+                <button class="btn btn-primary" onclick="openModal()">新增工单</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>工单号</th>
+                        <th>产品编码</th>
+                        <th>产品名称</th>
+                        <th>数量</th>
+                        <th>状态</th>
+                        <th>开始日期</th>
+                        <th>结束日期</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="workorderTable">
+                    <tr><td colspan="9" style="text-align:center">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3>新增工单</h3>
+            <form id="workorderForm">
+                <div class="form-group">
+                    <label>工单号</label>
+                    <input type="text" id="order_no" required>
+                </div>
+                <div class="form-group">
+                    <label>产品编码</label>
+                    <input type="text" id="product_code" required>
+                </div>
+                <div class="form-group">
+                    <label>产品名称</label>
+                    <input type="text" id="product_name" required>
+                </div>
+                <div class="form-group">
+                    <label>数量</label>
+                    <input type="number" id="quantity" required>
+                </div>
+                <div class="form-group">
+                    <label>开始日期</label>
+                    <input type="datetime-local" id="start_date" required>
+                </div>
+                <div class="form-group">
+                    <label>结束日期</label>
+                    <input type="datetime-local" id="end_date" required>
+                </div>
+                <button type="submit" class="btn btn-success">保存</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        async function loadWorkorder() {
+            const res = await fetch('/api/workorder');
+            const data = await res.json();
+            const tbody = document.getElementById('workorderTable');
+            tbody.innerHTML = data.map(item => `
+                <tr>
+                    <td>${item.order_no}</td>
+                    <td>${item.product_code}</td>
+                    <td>${item.product_name}</td>
+                    <td>${item.quantity}</td>
+                    <td><span class="status-${item.status.replace(' ', '_')}">${getStatusText(item.status)}</span></td>
+                    <td>${item.start_date ? new Date(item.start_date).toLocaleString() : '-'}</td>
+                    <td>${item.end_date ? new Date(item.end_date).toLocaleString() : '-'}</td>
+                    <td>${new Date(item.created_at).toLocaleString()}</td>
+                    <td class="actions">
+                        <button class="btn btn-warning" onclick="updateStatus(${item.id}, 'in_progress')">开始</button>
+                        <button class="btn btn-success" onclick="updateStatus(${item.id}, 'completed')">完成</button>
+                        <button class="btn btn-danger" onclick="deleteWorkorder(${item.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getStatusText(status) {
+            const map = { 'pending': '待处理', 'in_progress': '进行中', 'completed': '已完成', 'cancelled': '已取消' };
+            return map[status] || status;
+        }
+
+        function openModal() {
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('workorderForm').reset();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+
+        document.getElementById('workorderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const data = {
+                order_no: document.getElementById('order_no').value,
+                product_code: document.getElementById('product_code').value,
+                product_name: document.getElementById('product_name').value,
+                quantity: parseInt(document.getElementById('quantity').value),
+                start_date: document.getElementById('start_date').value,
+                end_date: document.getElementById('end_date').value
+            };
+            await fetch('/api/workorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            closeModal();
+            loadWorkorder();
+        });
+
+        async function updateStatus(id, status) {
+            await fetch(`/api/workorder/${id}/status?status=${status}`, { method: 'PUT' });
+            loadWorkorder();
+        }
+
+        async function deleteWorkorder(id) {
+            if (confirm('确定要删除这个工单吗？')) {
+                await fetch(`/api/workorder/${id}`, { method: 'DELETE' });
+                loadWorkorder();
+            }
+        }
+
+        loadWorkorder();
+    </script>
+</body>
+</html>
